@@ -1,9 +1,6 @@
 {
   "name": "weather-pipeline",
-  "build": {
-    "dockerfile": "../Dockerfile",
-    "context": ".."
-  },
+  "image": "fabriciobaiao/weather-pipeline:latest",
   "workspaceFolder": "/app",
   "settings": {
     "python.defaultInterpreterPath": "/usr/local/bin/python"
