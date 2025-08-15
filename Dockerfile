@@ -4,13 +4,20 @@ FROM python:3.11-slim
 # 2. Define o diretório de trabalho dentro do container
 WORKDIR /app
 
-# 3. Copia o arquivo de dependências e instala pacotes
+# 3. Instala dependências do sistema, incluindo Git
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    nano \
+    && rm -rf /var/lib/apt/lists/*
+
+# 4. Copia o arquivo de dependências e instala pacotes Python
 COPY requirements.txt .
-RUN pip install --upgrade pip \
+RUN pip install --upgrade pip setuptools wheel \
     && pip install -r requirements.txt
 
-# 4. Copia todo o código do projeto para dentro do container
+# 5. Copia todo o código do projeto para dentro do container
 COPY . .
 
-# 5. Comando padrão ao iniciar o container
-CMD ["python", "src/main.py"]
+# 6. Comando neutro para manter o container ativo
+CMD ["sleep", "infinity"]
