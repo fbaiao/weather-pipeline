@@ -1,23 +1,71 @@
+# Salva os dados em parquet
 import os
 import pandas as pd
-from src.utils import get_logger
-from src.config import Settings
+from utils import get_logger
+from pymongo import MongoClient
+from datetime import datetime, timezone
 
 logger = get_logger()
 
-def save_records(records: list[dict], cfg: Settings) -> None:
+# Save parquet file
+def save_to_parquet(records, path="./data/weather_data.parquet"):
     if not records:
-        logger.warning("Nenhum registro para salvar.")
+        logger.warning("No records to save.")
         return
-    os.makedirs(os.path.dirname(cfg.output_path), exist_ok=True)
+    
     df = pd.DataFrame(records)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    df.to_parquet(path, engine='pyarrow', index=False)
 
-    if cfg.output_format == "parquet":
-        path = cfg.output_path if cfg.output_path.endswith(".parquet") else cfg.output_path + ".parquet"
-        df.to_parquet(path, index=False)
-        logger.info("Parquet salvo em %s", path)
+    logger.info(f"Data saved in parquet file to {path}")
+
+# Save csv file
+def save_to_csv(records, path="./data/weather_data.csv"):
+    if not records:
+        logger.warning("No records to save.")
+        return
+    
+    df = pd.DataFrame(records)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    if os.path.exists(path):
+        df.to_csv(path, mode='a', header=False, index=False)
     else:
-        path = cfg.output_path if cfg.output_path.endswith(".csv") else cfg.output_path + ".csv"
-        header = not os.path.exists(path)
-        df.to_csv(path, index=False, mode="a" if not header else "w", header=header)
-        logger.info("CSV atualizado em %s", path)
+        df.to_csv(path, index=False)
+
+    logger.info(f"Data saved in csv file to {path}")
+
+# Save data in mongoDB database
+def save_to_mongodb(records, mongo_uri, db_name="weather_db", collection_name="weather_data"):
+    if not records:
+        logger.warning("No records to save to MongoDB.")
+        return
+    
+    try:
+        client = MongoClient(mongo_uri)
+        db = client[db_name]
+        collection = db[collection_name]
+
+        collection.insert_many(records)
+        logger.info(f"Data inserted into MongoDB: {db_name}.{collection_name} ({len(records)} records)")
+    except Exception as e:
+        logger.error(f"Error saving data to MongoDB: {e}")
+
+def save_log_mongodb(message, level="INFO", mongo_uri=None, db_name="weather_db", collection_name="execution_logs"):
+    if not mongo_uri:
+        logger.warning("MONGO_URI not set. Logs won't be saved to MongoDB.")
+        return
+    
+    try:
+        client = MongoClient(mongo_uri)
+        db = client[db_name]
+        collection = db[collection_name]
+
+        log_doc = {
+            "message": message,
+            "level": level,
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        }
+        collection.insert_one(log_doc)
+    except Exception as e:
+        logger.error(f"Error saving log to MongoDB: {e}")

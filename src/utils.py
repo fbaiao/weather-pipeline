@@ -1,3 +1,4 @@
+# Logs, erros, funções auxiliares
 import logging
 import sys
 
