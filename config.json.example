@@ -1,0 +1,12 @@
+{
+  "cities": [
+    "Lisbon",
+    "Porto",
+    "Madrid",
+    "Paris"
+  ],
+  "units": "metric",
+  "output_format": "csv",
+  "output_path_csv": "./data/weather_data.csv",
+  "output_path_parquet": "./data/weather_data.parquet"
+}
