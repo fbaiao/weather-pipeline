@@ -4,16 +4,19 @@ from utils import get_logger
 from save_data import save_to_parquet, save_to_mongodb, save_log_mongodb
 import os
 from dotenv import load_dotenv
+from datetime import datetime, timezone
+import uuid
 
 load_dotenv()
 logger = get_logger()
 
-# Orchestrates the execution of the project
 def main():
-    mongo_uri = None
-    try: 
-        #Load .env variables
-        mongo_uri = os.getenv("MONGO_URI")
+    mongo_uri = os.getenv("MONGO_URI")
+    run_id = str(uuid.uuid4())  # unique id for execution
+    start_time = datetime.now(timezone.utc)
+    errors = []
+
+    try:
         if not mongo_uri:
             logger.warning("MONGO_URI not set in .env file. MongoDB won't be used.")
         
@@ -21,40 +24,63 @@ def main():
         config = load_config("config.json")
         api_key = get_api_key()
 
-        # Cities and units from config
         cities = config.get("cities", [])
         units = config.get("units", "metric")
-        output_path = config.get("output_path_parquet", "weather_data.parquet")
+        output_path = config.get("output_path_parquet", "./data/weather_data.parquet")
 
         logger.info(f"Fetching weather data for cities: {cities}")
 
         # Fetch weather data
-        weather_records = get_weather_data(api_key, cities, units)
+        weather_records, errors = get_weather_data(api_key, cities, units)
 
-        if not weather_records:
-            logger.warning("No weather data fetched. Exiting.")
-            return
+        if weather_records:
+            # Show results in console
+            for r in weather_records:
+                logger.info(f"{r['city']} | {r['date']} | {r['temperature']}°C | {r['humidity']}% | {r['weather']}")
 
-        # Show results in console
-        for r in weather_records:
-            logger.info(f"{r['city']} | {r['date']} | {r['temperature']}°C | {r['humidity']}% | {r['weather']}")
+            # Save to parquet
+            save_to_parquet(weather_records, output_path)
 
-        # Save to parquet
-        save_to_parquet(weather_records, output_path)
+            # Save to MongoDB
+            if mongo_uri:
+                save_to_mongodb(weather_records, mongo_uri)
 
-        # Save to mongoDB collection
+        # Determine status
+        if weather_records and not errors:
+            status = "success"
+        elif weather_records and errors:
+            status = "partial_success"
+        else:
+            status = "failed"
+
+        end_time = datetime.now(timezone.utc)
+        records_processed = len(weather_records)
+
+        # Save pipeline log
         if mongo_uri:
-            save_to_mongodb(weather_records, mongo_uri)
-        
-        logger.info(f"Pipeline finished successfully. {len(weather_records)} records processed.")
-        if mongo_uri:
-            save_log_mongodb(f"Pipeline finished successfully. {len(weather_records)} records processed.", level="INFO",      mongo_uri=mongo_uri)
-    
+            save_log_mongodb(
+                run_id=run_id,
+                start_time=start_time,
+                end_time=end_time,
+                records_processed=len(weather_records),
+                errors=errors,
+                mongo_uri=mongo_uri
+            )
+
+        logger.info(f"Pipeline finished with status '{status}'. {records_processed} records processed.")
 
     except Exception as e:
+        end_time = datetime.now(timezone.utc)
         logger.exception(f"Pipeline failed with error: {e}")
         if mongo_uri:
-            save_log_mongodb(f"Pipeline failed with error: {e}", level="ERROR", mongo_uri=mongo_uri)
+            save_log_mongodb(
+                run_id=run_id,
+                start_time=start_time,
+                end_time=datetime.now(timezone.utc),
+                records_processed=0,
+                errors=[str(e)],
+                mongo_uri=mongo_uri
+            )
 
 if __name__ == "__main__":
     main()

@@ -4,7 +4,41 @@
 [![GitHub Repo](https://img.shields.io/badge/GitHub-weather--pipeline-blue?logo=github)](https://github.com/fbaiao/weather-pipeline)
 [![Docker Hub](https://img.shields.io/docker/pulls/fabriciobaiao/weather-pipeline)](https://hub.docker.com/r/fabriciobaiao/weather-pipeline)
 
-Daily Python pipeline to collect current weather from a list of cities using the OpenWeatherMap API.
+Daily Python pipeline to fetch current weather for a configurable list of cities using the OpenWeatherMap API.
+
+   - Saves results as Parquet (data folder)
+   - Inserts data into MongoDB (weather_data collection)
+   - Logs pipeline execution in MongoDB (pipeline_logs collection)
+   - Handles API/network errors gracefully without stopping execution
+
+---
+
+## Overview (pipeline details)
+
+1. Fetch Weather Data
+   - Uses OpenWeatherMap API to get current weather metrics (temperature, feels_like, humidity, description)
+   - Configurable list of cities and units (metric/imperial)
+
+2. Data Export
+   - Saves results as a Parquet file in the data folder
+   - Optional CSV export supported
+
+3. MongoDB Integration
+   - Inserts fetched weather data into weather_data collection
+   - Logs execution summary in pipeline_logs collection including:
+      - run_id (unique identifier for each run)
+      - Start and end timestamps
+      - Number of records processed
+      - Status (success, partial_success, failed)
+      - Errors for individual cities, without stopping pipeline
+
+4. Error Handling
+   - API or network failures are logged and do not interrupt the processing of remaining cities
+   - Partial successes are recorded with details of which cities failed
+
+5. Configuration
+   - .env file for MongoDB URI and API keys
+   - config.json for cities list, units, and output paths
 
 ---
 
@@ -25,7 +59,7 @@ Daily Python pipeline to collect current weather from a list of cities using the
 ---
 
 ## Logging
-   Logs are printed to stdout and optionally stored in MongoDB (via save_log_mongodb).
+   Logs are printed to stdout and stored in MongoDB (save_log_mongodb).
 
 ---
 
@@ -102,7 +136,7 @@ pytest -q
 
 weather_pipeline/
 │── src/
-│   ├── __init__.py        # to mark the folder `src` like a Phyton package
+│   ├── __init__.py        # to mark the folder `src` like a Python package
 │   ├── main.py            # entry point
 │   ├── fetch_weather.py   # API call
 │   ├── config.py          # config reader
