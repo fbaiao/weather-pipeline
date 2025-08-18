@@ -51,21 +51,34 @@ def save_to_mongodb(records, mongo_uri, db_name="weather_db", collection_name="w
     except Exception as e:
         logger.error(f"Error saving data to MongoDB: {e}")
 
-def save_log_mongodb(message, level="INFO", mongo_uri=None, db_name="weather_db", collection_name="execution_logs"):
+# Save a single execution log in MongoDB summarizing the pipeline run.
+def save_log_mongodb(run_id, start_time, end_time, records_processed, errors=None, mongo_uri=None, db_name="weather_db", collection_name="pipeline_logs"):
+
     if not mongo_uri:
         logger.warning("MONGO_URI not set. Logs won't be saved to MongoDB.")
         return
     
+    status = "success"
+    if errors:
+        if records_processed > 0:
+            status = "partial_success"
+        else:
+            status = "failed"
+
+    log_doc = {
+        "run_id": run_id,
+        "start_time": start_time.isoformat(),
+        "end_time": end_time.isoformat(),
+        "status": status,
+        "records_processed": records_processed,
+        "errors": errors or []
+    }
+
     try:
         client = MongoClient(mongo_uri)
         db = client[db_name]
         collection = db[collection_name]
-
-        log_doc = {
-            "message": message,
-            "level": level,
-            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-        }
         collection.insert_one(log_doc)
+        logger.info(f"Pipeline log saved_ run_id={run_id}, status={status}")
     except Exception as e:
-        logger.error(f"Error saving log to MongoDB: {e}")
+        logger.error(f"Error saving pipeline log to MongoDB: {e}")
