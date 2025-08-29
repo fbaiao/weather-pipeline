@@ -1,4 +1,3 @@
-# Salva os dados em parquet
 import os
 import pandas as pd
 from utils import get_logger
